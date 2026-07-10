@@ -1,0 +1,17 @@
+.env
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.db
+.pytest_cache/
+tmp/
+htmlcov/
+.coverage
+.DS_Store
+Thumbs.db
+# local dev harness (run-dev-8001.sh embeds secrets from ../.env — never commit)
+run-dev-8001.sh
+uvicorn-dev.log
+.worktrees/

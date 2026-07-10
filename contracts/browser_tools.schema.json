@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blockless.local/contracts/browser_tools.schema.json",
+  "title": "Browser MicroPython Skill Tool Envelope",
+  "type": "object",
+  "required": ["tool", "payload"],
+  "properties": {
+    "tool": {
+      "type": "string",
+      "enum": [
+        "approval_request",
+        "file_operation",
+        "device_command",
+        "browser_validate",
+        "phase_complete"
+      ]
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

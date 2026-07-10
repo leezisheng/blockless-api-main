@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blockless.local/contracts/device_command.schema.json",
+  "title": "Browser Device Command",
+  "type": "object",
+  "required": ["action"],
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": [
+        "connect_request",
+        "scan",
+        "probe",
+        "exec",
+        "cp",
+        "cp_from",
+        "deploy",
+        "ls",
+        "mkdir",
+        "rm",
+        "statvfs",
+        "soft_reset",
+        "hard_reset",
+        "stream",
+        "mip_install"
+      ]
+    },
+    "payload": {
+      "type": "object"
+    },
+    "requires_capability": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,6 @@
+{
+  "chip": "esp32-example",
+  "family": "esp32",
+  "notes": "Example chip entry. Production pin-fact tables (per-GPIO capability flags) are not included in this snapshot.",
+  "gpio": {}
+}

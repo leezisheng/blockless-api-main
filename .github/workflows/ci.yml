@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# Make uv use the setup-python interpreter instead of downloading its own.
+env:
+  UV_PYTHON_PREFERENCE: only-system
+
+jobs:
+  api:
+    name: api (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mpyhw_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d mpyhw_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mpyhw_test
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        run: pip install uv==0.11.13
+      - name: Test API
+        run: uv run --frozen pytest
+
+  lint:
+    name: lint (pylint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install pylint
+        run: pip install pylint
+      - name: Lint app/
+        run: python -m pylint app/ --rcfile=.pylintrc --fail-under=9.5
+
+  audit:
+    name: security (pip-audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        run: pip install uv==0.11.13
+      # Export the locked, prod-only dependency set (no dev group) and audit exactly that,
+      # so the audit matches what the production image installs.
+      - name: Export locked prod deps
+        run: uv export --frozen --no-dev --no-emit-project -o requirements-audit.txt
+      - name: Audit locked prod dependencies
+        run: uv tool run pip-audit -r requirements-audit.txt
+
+  content-freshness:
+    name: content freshness (regen drift)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        run: pip install uv==0.11.13
+      - name: Re-ingest GraftSense from the vendored corpus
+        run: uv run --frozen --no-dev python scripts/ingest_graftsense.py --repo-dir third_party/GraftSense-Drivers-MicroPython --output-dir content/packages
+      - name: Fail if committed content drifted
+        run: |
+          git diff --exit-code -- content/packages
+          status="$(git status --porcelain --untracked-files=all -- content/packages)"
+          if [ -n "$status" ]; then
+            echo "$status"
+            exit 1
+          fi
+
+  docker:
+    name: docker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      # Build the production image so a broken Dockerfile / uv sync fails here,
+      # not at Render deploy time (the image can't be built locally on Windows).
+      - name: Build production image
+        run: docker build -t blockless-api:ci .

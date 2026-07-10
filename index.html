@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blockless — 硬件版 Lovable，说出来它就长出来</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#050a14;--bg2:#0a1428;
+  --cyan:#00f5ff;--purple:#8b5cf6;--green:#00ff9d;
+  --amber:#ffb020;--pink:#ff5c8a;--blue:#4d7cff;
+  --text:#dbe4f0;--dim:#8494ad;--dim2:#3a4a63;
+  --gcyan:0 0 20px rgba(0,245,255,.5),0 0 44px rgba(0,245,255,.18);
+  --gpur:0 0 20px rgba(139,92,246,.5),0 0 44px rgba(139,92,246,.18);
+  --ggreen:0 0 20px rgba(0,255,157,.5),0 0 44px rgba(0,255,157,.18);
+  --gpink:0 0 20px rgba(255,92,138,.5),0 0 44px rgba(255,92,138,.18);
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Microsoft YaHei','PingFang SC',sans-serif}
+#bgc{position:fixed;inset:0;z-index:0;opacity:.35}
+.grid-bg{position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(0,245,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,245,255,.04) 1px,transparent 1px);background-size:46px 46px;pointer-events:none}
+.scanlines{position:fixed;inset:0;z-index:1;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.12) 2px,rgba(0,0,0,.12) 4px);pointer-events:none}
+.deck{position:fixed;inset:0;z-index:10}
+.slide{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;opacity:0;transform:translate3d(100%,0,0);transition:opacity .6s cubic-bezier(.77,0,.175,1),transform .6s cubic-bezier(.77,0,.175,1);pointer-events:none;overflow:hidden}
+.slide.active{opacity:1;transform:translate3d(0,0,0);pointer-events:all}
+.slide.exit{opacity:0;transform:translate3d(-100%,0,0)}
+.slide-inner{width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 64px;transform-origin:top center;transition:transform .3s ease;box-sizing:border-box}
+#counter{position:fixed;top:20px;right:30px;z-index:200;font:12px/1 'Courier New',monospace;color:var(--dim);letter-spacing:3px}
+#pgbar{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--cyan),var(--purple));z-index:200;transition:width .5s ease}
+.nav-dots{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);display:flex;gap:9px;z-index:200}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--dim2);cursor:pointer;transition:all .3s}
+.dot.on{background:var(--cyan);box-shadow:var(--gcyan);width:26px;border-radius:4px}
+.arr{position:fixed;top:50%;transform:translateY(-50%);z-index:200;width:46px;height:46px;border-radius:50%;background:rgba(0,245,255,.08);border:1px solid rgba(0,245,255,.25);color:var(--cyan);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .3s;user-select:none}
+.arr:hover{background:rgba(0,245,255,.2);box-shadow:var(--gcyan)}
+#al{left:20px}#ar{right:20px}
+.stag{opacity:0;transform:translateY(28px);transition:opacity .6s ease,transform .6s ease}
+.stag.show{opacity:1;transform:none}
+.d1{transition-delay:.12s}.d2{transition-delay:.26s}.d3{transition-delay:.40s}
+.d4{transition-delay:.54s}.d5{transition-delay:.68s}.d6{transition-delay:.82s}
+.stl{font:12px/1 'Courier New',monospace;letter-spacing:5px;color:var(--cyan);text-transform:uppercase;margin-bottom:14px}
+.stl::before{content:'// ';color:var(--dim)}
+.sep{width:64px;height:3px;background:linear-gradient(90deg,var(--cyan),var(--purple));border-radius:2px;margin:18px auto}
+.cx{color:var(--cyan);text-shadow:var(--gcyan)}
+.px{color:var(--purple)}.gx{color:var(--green);text-shadow:var(--ggreen)}
+.ax{color:var(--amber)}.pkx{color:var(--pink);text-shadow:var(--gpink)}.bx{color:var(--blue)}.dim{color:var(--dim)}
+.content-box{max-width:1120px;width:100%}
+.logo-ring{width:104px;height:104px;border:3px solid var(--cyan);border-radius:26px;display:flex;align-items:center;justify-content:center;font-size:48px;margin:0 auto 30px;box-shadow:var(--gcyan);animation:breathe 3s ease-in-out infinite}
+.main-title{font-size:clamp(40px,7vw,96px);font-weight:900;letter-spacing:-2px;background:linear-gradient(130deg,#00f5ff 0%,#8b5cf6 55%,#ff5c8a 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:16px;line-height:1.02}
+.sub-title{font-size:clamp(14px,1.8vw,22px);color:var(--dim);letter-spacing:5px;margin-bottom:28px}
+.ver-badge{display:inline-flex;align-items:center;gap:9px;padding:9px 22px;border:1px solid rgba(0,245,255,.35);border-radius:30px;font:13px/1 'Courier New',monospace;color:var(--cyan);background:rgba(0,245,255,.05);margin-bottom:28px}
+.ver-badge::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:var(--gcyan);animation:pulse 1.5s ease-in-out infinite}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+@keyframes pulse{0%,100%{opacity:.9}50%{opacity:.3}}
+@keyframes caret{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes rise{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+h2{font-size:clamp(28px,4vw,52px);color:var(--cyan);margin-bottom:8px;text-shadow:var(--gcyan);line-height:1.15}
+h3{font-size:clamp(18px,2.1vw,26px);color:var(--purple);margin:6px 0 10px 0}
+p{font-size:16px;line-height:1.8;color:var(--text)}
+.big{font-size:clamp(26px,4.6vw,60px);font-weight:800;line-height:1.32;text-align:center;max-width:1040px;margin:0 auto}
+.huge{font-size:clamp(34px,6.6vw,88px);font-weight:900;line-height:1.1;text-align:center;letter-spacing:-1px}
+.lead{font-size:clamp(16px,2.1vw,24px);color:var(--dim);line-height:1.7;text-align:center;max-width:920px;margin:0 auto}
+.card{background:rgba(255,255,255,.03);border:1px solid rgba(0,245,255,.18);border-radius:16px;padding:26px 30px;position:relative;overflow:hidden;transition:all .3s}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(0,245,255,.5),transparent)}
+.card:hover{border-color:rgba(0,245,255,.45);box-shadow:var(--gcyan);transform:translateY(-4px)}
+.card.p{border-color:rgba(139,92,246,.22)}.card.p::before{background:linear-gradient(90deg,transparent,rgba(139,92,246,.5),transparent)}.card.p:hover{box-shadow:var(--gpur)}
+.card.g{border-color:rgba(0,255,157,.22)}.card.g::before{background:linear-gradient(90deg,transparent,rgba(0,255,157,.5),transparent)}.card.g:hover{box-shadow:var(--ggreen)}
+.card.a{border-color:rgba(255,176,32,.22)}.card.a::before{background:linear-gradient(90deg,transparent,rgba(255,176,32,.5),transparent)}.card.a:hover{box-shadow:0 0 20px rgba(255,176,32,.4)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:26px;width:100%;max-width:1060px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:22px;width:100%;max-width:1120px}
+.chip{display:inline-block;padding:7px 16px;border-radius:22px;font:13px/1 'Courier New',monospace;border:1px solid rgba(0,245,255,.3);color:var(--cyan);background:rgba(0,245,255,.05);margin:4px}
+.prompt-box{max-width:760px;width:100%;margin:0 auto;background:#040810;border:1px solid rgba(0,245,255,.3);border-radius:16px;padding:26px 30px;text-align:left;box-shadow:inset 0 0 50px rgba(0,245,255,.06),var(--gcyan)}
+.prompt-lbl{font:12px/1 'Courier New',monospace;color:var(--dim);letter-spacing:2px;margin-bottom:14px}
+.prompt-txt{font-size:clamp(18px,2.6vw,30px);color:var(--text);line-height:1.5}
+.caret{display:inline-block;width:3px;height:1em;background:var(--cyan);vertical-align:-3px;margin-left:4px;animation:caret 1s step-end infinite;box-shadow:var(--gcyan)}
+.btn{display:inline-block;padding:15px 38px;background:linear-gradient(135deg,var(--cyan),var(--purple));color:#050a14;border-radius:30px;text-decoration:none;font-weight:bold;box-shadow:var(--gcyan);transition:all .3s;font-size:16px}
+.btn:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(0,245,255,.4)}
+.flow{display:flex;align-items:stretch;gap:8px;justify-content:center;flex-wrap:nowrap}
+.fstep{display:flex;flex-direction:column;align-items:center;gap:12px;flex:1;text-align:center;max-width:190px}
+.fico{width:82px;height:82px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:38px;border:2px solid var(--cyan);box-shadow:var(--gcyan)}
+.farr{font-size:32px;color:var(--dim2);align-self:center}
+.soon{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;background:rgba(255,176,32,.1);border:1px solid rgba(255,176,32,.4);color:var(--amber);font:12px/1 'Courier New',monospace;letter-spacing:2px}
+.mono{font-family:'Courier New',monospace}
+.persona{font-size:44px;animation:rise 3.5s ease-in-out infinite}
+</style>
+</head>
+<body>
+<canvas id="bgc"></canvas>
+<div class="grid-bg"></div>
+<div class="scanlines"></div>
+<div id="counter"><span id="cn">01</span> / <span id="tn">09</span></div>
+<div id="pgbar"></div>
+<div class="nav-dots" id="dots"></div>
+<div class="arr" id="al">‹</div>
+<div class="arr" id="ar">›</div>
+<div class="deck" id="deck">
+
+<!-- 1 封面 -->
+<div class="slide active">
+  <div class="logo-ring stag show">&#9631;</div>
+  <div class="main-title stag show d1">Blockless</div>
+  <div class="sub-title stag show d2">硬件版 &nbsp;LOVABLE</div>
+  <div class="ver-badge stag show d3">说出来，它就长出来</div>
+  <div class="sep stag show d4"></div>
+  <div class="lead stag show d5" style="font-size:clamp(18px,2.8vw,32px);color:var(--text);font-weight:600">
+    你不需要懂电路、不需要会写代码、不需要买任何零件。<br>
+    <span class="cx">一句话，就能做出一个真正的硬件小玩意。</span>
+  </div>
+</div>
+
+<!-- 2 AI 生成还不够，小白还是做不出来 -->
+<div class="slide">
+  <div class="content-box" style="text-align:center">
+    <div class="stl stag">THE REAL GAP</div>
+    <h2 class="stag d1">AI 已经能生成代码和电路图了——小白还是做不出来</h2>
+    <div class="sep stag d1"></div>
+    <div class="g2 stag d2" style="margin:24px auto 0">
+      <div class="card">
+        <h3 style="color:var(--cyan)">AI 已经做到的</h3>
+        <p class="dim">AI 生成嵌入式代码、AI 生成电路图、二维电路仿真——<span class="cx">听起来门槛已经没了。</span></p>
+      </div>
+      <div class="card a">
+        <h3 style="color:var(--amber)">但小白还是被挡在门外</h3>
+        <p class="dim">这些工具仍然默认你<span class="ax">看得懂代码、会连线焊接、先买好一堆实体零件</span>——不是真正的 vibe，天马行空落不了地。</p>
+      </div>
+    </div>
+    <div class="big stag d4" style="margin-top:28px;font-size:clamp(18px,2.7vw,34px)">
+      真正的门槛不是「生成」，是「<span class="pkx">我怎么知道它能用？</span>」<br>
+      <span class="cx">小白得先亲眼看到它跑起来，才敢下单、才敢动手。</span>
+    </div>
+  </div>
+</div>
+
+<!-- 3 一句话 -->
+<div class="slide">
+  <div class="content-box" style="text-align:center">
+    <div class="stl stag">JUST SAY IT</div>
+    <h2 class="stag d1">你只需要说：我想要一个……</h2>
+    <div class="sep stag d1"></div>
+    <div class="prompt-box stag d2" style="margin-top:26px">
+      <div class="prompt-lbl">&#9631; 告诉 Blockless 你想做什么</div>
+      <div class="prompt-txt">做一个<span class="cx">开门就会尖叫</span>的盒子，还能<span class="px">偷偷提醒我的手机</span><span class="caret"></span></div>
+    </div>
+    <div class="stag d4" style="margin-top:24px">
+      <span class="chip">「提醒我浇花的小东西」</span>
+      <span class="chip">「会跟着我走的蓝牙小车」</span>
+      <span class="chip">「宠物喂食器，手机能控制」</span>
+    </div>
+    <p class="lead stag d5" style="margin-top:24px">用大白话，用你自己的说法。<span class="cx">剩下的，交给它。</span></p>
+  </div>
+</div>
+
+<!-- 4 魔法时刻 -->
+<div class="slide">
+  <div class="content-box" style="text-align:center">
+    <div class="stl stag">THE MAGIC MOMENT</div>
+    <div class="flow stag d1" style="margin:20px 0 34px">
+      <div class="fstep"><div class="fico">&#128172;</div><b class="cx">一句话</b><span class="dim" style="font-size:13px">说出你想要的</span></div>
+      <div class="farr">→</div>
+      <div class="fstep"><div class="fico" style="border-color:var(--purple);box-shadow:var(--gpur)">&#10024;</div><b class="px">它自己搞定</b><span class="dim" style="font-size:13px">挑零件·接线·写好一切</span></div>
+      <div class="farr">→</div>
+      <div class="fstep"><div class="fico" style="border-color:var(--green);box-shadow:var(--ggreen)">&#128302;</div><b class="gx">在浏览器里活过来</b><span class="dim" style="font-size:13px">30 秒，你亲眼看它动</span></div>
+    </div>
+    <div class="huge stag d3">不是给你一堆代码。<br><span class="gx">是让你看见——它，动，了。</span></div>
+    <p class="lead stag d5" style="margin-top:26px">这一刻，从「我觉得应该能行吧？」变成<span class="cx">「卧槽，它真的动了！」</span></p>
+  </div>
+</div>
+
+<!-- 5 独特：世界第一个 -->
+<div class="slide">
+  <div class="content-box" style="text-align:center">
+    <div class="stl stag">WORLD FIRST</div>
+    <h2 class="stag d1">世界上第一个「一句话长出一整个硬件装置」的东西</h2>
+    <div class="sep stag d1"></div>
+    <div class="big stag d2" style="margin-top:22px;font-size:clamp(19px,2.7vw,34px)">
+      别人给你<span class="dim">一半</span>，我们给你<span class="cx">整个东西</span>。
+    </div>
+    <div class="g3 stag d4" style="margin-top:30px">
+      <div class="card a"><h3 style="color:var(--amber)">AI 画电路图 + 二维仿真</h3><p class="dim">平面图纸，你还得看得懂、会连线焊接</p></div>
+      <div class="card a"><h3 style="color:var(--amber)">AI 写嵌入式代码</h3><p class="dim">给你代码，但要真机、要调试，能不能跑得自己试</p></div>
+      <div class="card"><h3 style="color:var(--cyan)">Blockless</h3><p><span class="cx">一句话，一整个能跑的 3D 硬件装置——先看见，再决定买或做。</span></p></div>
+    </div>
+    <p class="lead stag d6" style="margin-top:24px">Lovable 让不懂代码的人做出软件。<span class="cx">Blockless 让不懂硬件的人做出硬件。</span></p>
+  </div>
+</div>
+
+<!-- 6 即将到来：真的 3D 仿真 -->
+<div class="slide">
+  <div class="content-box" style="text-align:center">
+    <div class="stl stag">COMING NEXT</div>
+    <div class="soon stag d1" style="margin-bottom:16px">&#9679; 下一站</div>
+    <h2 class="stag d1">真正的三维仿真，就像 Wokwi 一样真</h2>
+    <div class="sep stag d1"></div>
+    <div class="big stag d2" style="margin-top:20px;font-size:clamp(19px,2.7vw,34px)">
+      你的硬件会以<span class="cx">真实的 3D</span>出现在浏览器里——<br>可以转、可以拆、<span class="gx">通上电就真的跑起来。</span>
+    </div>
+    <div class="g2 stag d4" style="margin-top:28px;max-width:960px">
+      <div class="card a"><h3 style="color:var(--amber)">Wokwi 那样的仿真</h3><p class="dim">很真，但你得自己连线、自己写代码、自己调试</p></div>
+      <div class="card g"><h3 style="color:var(--green)">Blockless 的仿真</h3><p><span class="gx">一样真，但全是 AI 帮你生成的。</span>你只管看它跑，满意了再造出实物。</p></div>
+    </div>
+    <p class="lead stag d6" style="margin-top:22px">灯亮、屏幕显示、马达转、传感器读数……<span class="cx">在花一分钱之前，你先看见它活着。</span></p>
+  </div>
+</div>
+
+<!-- 7 三个人 -->
+<div class="slide">
+  <div class="content-box" style="text-align:center">
+    <div class="stl stag">WHO IT'S FOR</div>
+    <h2 class="stag d1">同一句话，改变三种人</h2>
+    <div class="sep stag d1"></div>
+    <div class="g3 stag d2" style="margin-top:26px">
+      <div class="card a"><div class="persona">&#127891;</div><h3 style="color:var(--amber);margin-top:8px">学生</h3><p class="dim">开学第一节课就做出会闪的灯，而不是熬到第 9 周还在配环境。</p></div>
+      <div class="card"><div class="persona" style="animation-delay:.5s">&#128104;&#8205;&#128300;</div><h3 style="color:var(--cyan);margin-top:8px">创客</h3><p class="dim">在仿真里试错成本是零，第一版电路板就是对的——省下 $5,000 和 6 周。</p></div>
+      <div class="card p"><div class="persona" style="animation-delay:1s">&#128717;&#65039;</div><h3 style="color:var(--purple);margin-top:8px">卖家</h3><p class="dim">众筹页面直接嵌入能玩的 3D 硬件——买家先「试用」，再下单。</p></div>
+    </div>
+    <p class="lead stag d5" style="margin-top:24px">
+      <span class="chip">从第 9 周到第 1 周</span>
+      <span class="chip">错误从 $5,000 变成 $0</span>
+      <span class="chip">硬件的 Free Trial</span>
+    </p>
+  </div>
+</div>
+
+<!-- 8 为什么是我们 -->
+<div class="slide">
+  <div class="content-box" style="text-align:center">
+    <div class="stl stag">WHY US</div>
+    <h2 class="stag d1">这个位置，只有我们站着</h2>
+    <div class="sep stag d1"></div>
+    <div class="big stag d2" style="margin-top:22px;font-size:clamp(20px,3vw,38px)">
+      有人做 AI 画电路板，有人做手动仿真，<br><span class="cx">没有人做「说一句话 → 一整个硬件 → 一键变实物」。</span>
+    </div>
+    <div class="g3 stag d4" style="margin-top:30px">
+      <div class="card"><h3 style="color:var(--cyan)">说一句话就生成</h3><p class="dim">而不是手动拖零件、写代码</p></div>
+      <div class="card p"><h3>看得见地跑起来</h3><p class="dim">3D 仿真，不是静态渲染图</p></div>
+      <div class="card g"><h3 style="color:var(--green)">一键变成真东西</h3><p class="dim">同一份设计，直接下单造出来</p></div>
+    </div>
+    <p class="lead stag d6" style="margin-top:24px">别人有一段，我们有<span class="cx">一整条路：从想法，到实物。</span></p>
+  </div>
+</div>
+
+<!-- 9 愿景 + 结尾 -->
+<div class="slide">
+  <div class="content-box" style="text-align:center">
+    <div class="logo-ring stag" style="width:84px;height:84px;font-size:38px">&#9631;</div>
+    <div class="big stag d2" style="margin:12px auto 10px">
+      <span class="cx">描述你的想法 → 看它在浏览器里跑 → 一键造出真东西。</span>
+    </div>
+    <p class="lead stag d3" style="font-size:clamp(16px,2.2vw,26px);color:var(--text);margin-bottom:28px">
+      「AI 写代码」是去年的故事。<br><span class="px">今年的故事是：说一句话，一个硬件在你眼前活过来。</span><br>
+      <b class="cx">Blockless，是这个故事里唯一的玩家。</b>
+    </p>
+    <div class="stag d4">
+      <span class="chip" style="font-size:14px;padding:9px 18px">硬件版 Lovable</span>
+      <span class="chip" style="font-size:14px;padding:9px 18px">Vibe Hardware</span>
+      <span class="chip" style="font-size:14px;padding:9px 18px">说出来，它就长出来</span>
+    </div>
+    <div class="stag show d6" style="margin-top:34px">
+      <a href="#" class="btn" onclick="goToSlide(0);return false">↺ 返回首页</a>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+const canvas=document.getElementById('bgc');
+const ctx=canvas.getContext('2d');
+canvas.width=window.innerWidth;canvas.height=window.innerHeight;
+const P=[];
+for(let i=0;i<64;i++){P.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,vx:(Math.random()-.5)*.26,vy:(Math.random()-.5)*.26,r:Math.random()*1.8+1});}
+function animate(){
+  ctx.fillStyle='rgba(5,10,20,.06)';ctx.fillRect(0,0,canvas.width,canvas.height);
+  for(let i=0;i<P.length;i++){
+    const p=P[i];p.x+=p.vx;p.y+=p.vy;
+    if(p.x<0||p.x>canvas.width)p.vx*=-1;
+    if(p.y<0||p.y>canvas.height)p.vy*=-1;
+    for(let j=i+1;j<P.length;j++){
+      const q=P[j],dx=p.x-q.x,dy=p.y-q.y,d=Math.hypot(dx,dy);
+      if(d<135){ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(q.x,q.y);ctx.strokeStyle='rgba(0,245,255,'+(.12*(1-d/135))+')';ctx.lineWidth=1;ctx.stroke();}
+    }
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba(0,245,255,.55)';ctx.fill();
+  }
+  requestAnimationFrame(animate);
+}
+animate();
+
+const slides=document.querySelectorAll('.slide');
+const total=slides.length;
+let current=0;
+document.getElementById('tn').textContent=total.toString().padStart(2,'0');
+function updateSlide(){
+  slides.forEach((s,i)=>{
+    s.classList.remove('active','exit');
+    if(i===current){s.classList.add('active');setTimeout(()=>{s.querySelectorAll('.stag').forEach(el=>el.classList.add('show'));scaleSlide(s);},50);}
+    else if(i<current){s.classList.add('exit');}
+  });
+  document.getElementById('cn').textContent=(current+1).toString().padStart(2,'0');
+  document.getElementById('pgbar').style.width=(current+1)/total*100+'%';
+  document.querySelectorAll('.dot').forEach((d,i)=>d.classList.toggle('on',i===current));
+}
+function goToSlide(n){if(n>=0&&n<total){slides[current].querySelectorAll('.stag').forEach(el=>el.classList.remove('show'));current=n;updateSlide();}}
+function nextSlide(){if(current<total-1){slides[current].querySelectorAll('.stag').forEach(el=>el.classList.remove('show'));current++;updateSlide();}}
+function prevSlide(){if(current>0){slides[current].querySelectorAll('.stag').forEach(el=>el.classList.remove('show'));current--;updateSlide();}}
+const dotsContainer=document.getElementById('dots');
+for(let i=0;i<total;i++){const d=document.createElement('div');d.className='dot';if(i===0)d.classList.add('on');d.onclick=()=>goToSlide(i);dotsContainer.appendChild(d);}
+document.getElementById('al').onclick=prevSlide;
+document.getElementById('ar').onclick=nextSlide;
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' ')nextSlide();if(e.key==='ArrowLeft')prevSlide();if(e.key==='Home')goToSlide(0);if(e.key==='End')goToSlide(total-1);});
+let tsx=0;
+document.addEventListener('touchstart',e=>{tsx=e.touches[0].clientX;});
+document.addEventListener('touchend',e=>{const tex=e.changedTouches[0].clientX;if(tsx-tex>50)nextSlide();if(tex-tsx>50)prevSlide();});
+window.addEventListener('resize',()=>{canvas.width=window.innerWidth;canvas.height=window.innerHeight;scaleSlide(slides[current]);});
+function scaleSlide(slideEl){
+  const inner=slideEl.querySelector('.slide-inner');if(!inner)return;
+  inner.style.transform='scale(1)';inner.style.marginTop='0';
+  const vh=window.innerHeight,vw=window.innerWidth,ih=inner.scrollHeight,iw=inner.scrollWidth;
+  const scale=Math.min(vh/ih,vw/iw,1.14);
+  inner.style.transform='scale('+scale+')';
+  if(scale<1)inner.style.marginTop=((vh-ih*scale)/2)+'px';
+}
+slides.forEach(slide=>{const w=document.createElement('div');w.className='slide-inner';while(slide.firstChild)w.appendChild(slide.firstChild);slide.appendChild(w);});
+updateSlide();
+</script>
+</body>
+</html>

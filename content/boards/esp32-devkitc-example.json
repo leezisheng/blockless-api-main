@@ -1,0 +1,13 @@
+{
+  "board_id": "esp32-devkitc-example",
+  "display_name": "ESP32 DevKitC (example)",
+  "chip_family": "esp32",
+  "pin_allocation_supported": false,
+  "firmware": {
+    "latest_release": {
+      "version": "example",
+      "url": null
+    }
+  },
+  "notes": "Example board entry illustrating the content/boards schema."
+}

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://blockless.local/contracts/browser_validate.schema.json",
+  "title": "Browser Validation Request",
+  "type": "object",
+  "required": ["kind", "input"],
+  "properties": {
+    "kind": {"$ref": "#/$defs/kind"},
+    "input": {"type": "object"},
+    "capabilities": {
+      "type": "array",
+      "items": {"type": "string"}
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "kind": {
+      "type": "string",
+      "enum": [
+        "project_files",
+        "manifest",
+        "manifest_phase",
+        "select_hw_manifest",
+        "scaffold_generate",
+        "scaffold_contract",
+        "deploy_plan",
+        "deploy_result_judge",
+        "generate_quality",
+        "python_syntax",
+        "simulate_run",
+        "package_fetch",
+        "package_resolve",
+        "upypi_resolve",
+        "doc_fetch",
+        "doc_extract_pdf",
+        "arduino_convert",
+        "diagram_mermaid",
+        "diagram_render",
+        "wiring",
+        "wiring_render",
+        "firmware_page_resolve",
+        "firmware_download",
+        "firmware_flash_plan",
+        "firmware_flash_execute",
+        "uf2_manual_confirm",
+        "mpy_compile",
+        "review_context",
+        "review_verify",
+        "autofix_triage",
+        "hardware_sanity",
+        "device_test_plan",
+        "awesome_micropython_search"
+      ]
+    }
+  }
+}

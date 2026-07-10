@@ -1,0 +1,37 @@
+# Build context is the blockless-api repo root. The image needs app/, content/,
+# contracts/, and third_party/browser-micropython-skills. This keeps the context small
+# and keeps secrets plus the large GraftSense development corpus out of the image.
+
+.git
+.github
+.claude
+.vscode
+
+# secrets: never bake into an image
+**/.env
+.env
+
+# the API image only needs app/, content/, pyproject.toml, uv.lock,
+# contracts/, and third_party/browser-micropython-skills.
+build/
+dist/
+dev/
+docs/
+assets/
+tmp/
+test/
+.tmp-mpremote-venv/
+
+# API tests / local virtualenvs are not part of the runtime image
+tests/
+.venv/
+
+# the large drivers corpus is NOT served by the API (only browser-micropython-skills is)
+third_party/GraftSense*
+
+# python / node / editor cruft
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/node_modules/
+**/*.vsix

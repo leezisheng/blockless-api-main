@@ -1,0 +1,57 @@
+[project]
+name = "blockless-api"
+version = "0.1.0"
+description = "Blockless browser-native hardware build API."
+requires-python = ">=3.12"
+# Direct runtime dependencies. Session tokens use the stdlib (hmac/hashlib/base64),
+# so there is no JWT package here.
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+    "httpx>=0.28",               # required by fastapi.testclient.TestClient
+    "pydantic>=2",
+    "email-validator>=2",        # required by pydantic.EmailStr
+    "jsonschema>=4",             # driver_context schema validation (ingest gate + serve-time check)
+    "psycopg[binary,pool]>=3.2",
+    "sentry-sdk>=2",             # optional error tracking; active only when SENTRY_DSN is set
+    "pypdf>=4",                  # browser_validate.doc_extract_pdf (pure-python PDF text extraction)
+    "mpy-cross>=1.24",           # browser_validate.mpy_compile (MicroPython cross-compiler wheel)
+]
+
+# Test-only deps: installed in CI (uv sync) but excluded from the prod image (uv sync --no-dev).
+[dependency-groups]
+dev = [
+    "cadquery>=2.8.0",
+    "cascadio>=0.0.17",
+    "fast-simplification>=0.1.13",
+    "manifold3d>=3.0",
+    "matplotlib>=3.11.0",
+    "networkx>=3",                # required by trimesh.repair.fill_holes for skin mesh repair testing
+    "pytest>=8",
+    "pytest-asyncio>=0.25",
+    "rtree>=1.2",                # trimesh's spatial index, required by mesh.contains()/union()/difference()
+    "shapely>=2",                 # trimesh Path2D polygon ops (section().to_2D().polygons_full) for skin gates
+    "trimesh>=4",                # dev-only: GLB integrity validation in tests + one-time asset conversion (NOT a runtime import)
+]
+
+[tool.uv]
+# The service runs via PYTHONPATH=/app (see Dockerfile); it is not installed as a package,
+# so uv should manage the environment without trying to build the project itself.
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+# --strict-markers: a typo'd @pytest.mark.* fails instead of silently no-op'ing.
+# --strict-config: a typo in this config block fails instead of being ignored.
+addopts = "--strict-markers --strict-config"
+# Pin the async fixture loop scope so the suite is quiet now and stable when
+# pytest-asyncio flips this default to function scope in a future release.
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "slow: timing-sensitive or otherwise slow test",
+    "serial: needs pyserial / a real serial port",
+    "subprocess: spawns a real child process",
+    "no_db: does not touch the Postgres-backed app stores",
+    "db: needs a reachable Postgres (skipped when DATABASE_URL is unset)",
+]

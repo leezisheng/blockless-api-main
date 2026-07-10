@@ -1,0 +1,56 @@
+services:
+  - type: web
+    name: blockless-web-api
+    runtime: docker
+    plan: starter
+    region: virginia
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    healthCheckPath: /v1/health/ready
+    envVars:
+      - key: PORT
+        value: "8080"
+      # Staging blueprint: the gateway is stateless (session tokens are signed, not stored;
+      # rate-limit counters live in Redis), so it scales horizontally behind an HPA in the
+      # Helm deployment. On the Render starter plan we run a single instance for staging.
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: MPYHW_ENV
+        value: prod
+      # Prod is login-gated (Google sign-in); the guest-mint bypass defaults OPEN in code, so pin it
+      # closed here explicitly. /v1/auth/guest returns 403 guest_disabled with this set.
+      - key: MPYHW_ALLOW_GUEST
+        value: "0"
+      # Render fronts the app with exactly one proxy, so trust X-Forwarded-For for the
+      # real client IP in the per-IP rate limiters (off by default would key on the proxy).
+      - key: MPYHW_TRUST_PROXY_HEADERS
+        value: "1"
+      # Global free-tier daily credit ceiling (fail-fast 503 past it). Set to a real number
+      # to arm the cost/DoS guard; unset/0 disables it. Tune to the inference tier's capacity.
+      - key: MPYHW_DAILY_GLOBAL_BUDGET
+        sync: false
+      - key: MPYHW_PUBLIC_API_BASE
+        value: https://blockless-web-api.onrender.com
+      - key: MPYHW_BROWSER_AUTH_REDIRECT_ORIGINS
+        value: https://block-less.com
+      - key: MPYHW_GOOGLE_CLIENT_ID
+        sync: false
+      - key: MPYHW_GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: blockless-web-db
+          property: connectionString
+      - key: MPYHW_JWT_SECRET
+        generateValue: true
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: MPYHW_ADMIN_TOKEN
+        sync: false
+
+databases:
+  - name: blockless-web-db
+    databaseName: mpyhw
+    user: mpyhw
+    plan: basic-256mb
+    region: virginia

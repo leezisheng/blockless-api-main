@@ -1,0 +1,390 @@
+"""Durable per-user credit balance, backed by Postgres via `DATABASE_URL`."""
+from __future__ import annotations
+
+import json
+import math
+import os
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
+from app import db
+
+CREDIT_TOKENS = 10_000
+DAILY_GRANT = int(os.getenv("MPYHW_DAILY_GRANT", "50"))
+# Anonymous guests (design's "build before sign-in") get a smaller daily grant than signed-in
+# users — enough to feel the build loop, with sign-in unlocking the full grant. The global
+# free-tier daily budget (MPYHW_DAILY_GLOBAL_BUDGET) remains the real abuse/cost ceiling.
+GUEST_GRANT = int(os.getenv("MPYHW_GUEST_GRANT", "15"))
+
+
+class GlobalBudgetExceeded(Exception):
+    """Raised by reserve() when today's global free-tier spend would cross the configured
+    daily budget. The caller maps it to a fail-fast 503 -- never a silent allow. This is the
+    cost/DoS ceiling the daily_global_spend tally was always meant to enforce."""
+
+    def __init__(self, spent: int):
+        super().__init__(f"global daily credit budget exceeded (spent={spent})")
+        self.spent = spent
+
+
+def _parse_grant_overrides(raw: str) -> dict[str, int]:
+    """Map of GitHub login (lowercased) -> per-user daily grant, e.g.
+    MPYHW_GRANT_OVERRIDES='{"xinruili-git": 500}'."""
+    if not raw:
+        return {}
+    return {str(k).lower(): int(v) for k, v in json.loads(raw).items()}
+
+
+_GRANT_OVERRIDES = _parse_grant_overrides(os.getenv("MPYHW_GRANT_OVERRIDES", ""))
+
+
+def grant_for(user: dict[str, Any]) -> int:
+    """The daily grant to refill this user to: an env-configured per-login override,
+    else the global default. Resolving the grant at the call site (not by hand-editing
+    credit_balances.daily_grant) is what makes an override durable: the UTC-midnight
+    refill in `ensure_daily_grant` rewrites daily_grant from whatever grant is passed in,
+    so a raw DB edit would be clobbered the next day while this is reapplied every day."""
+    if str(user.get("id", "")).startswith("guest:"):
+        return GUEST_GRANT
+    return _GRANT_OVERRIDES.get((user.get("login") or "").lower(), DAILY_GRANT)
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _next_utc_midnight(now: datetime) -> datetime:
+    return (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def _user_id(user: dict[str, Any]) -> str:
+    return str(user["id"])
+
+
+def credits_for_tokens(total_tokens: int) -> int:
+    if total_tokens <= 0:
+        return 0
+    return math.ceil(total_tokens / CREDIT_TOKENS)
+
+
+def record_tokens(user: dict[str, Any], tokens: int, now: datetime | None = None) -> int:
+    """Add `tokens` to today's cumulative tally; return the whole credits this call
+    pushes the running daily total across (0 or more).
+
+    Cumulative, not per-call: credits are charged per full CREDIT_TOKENS consumed
+    across the day, so a long agent session of many small calls doesn't pay a
+    rounded-up credit per call. Assumes `ensure_daily_grant` created/reset the row.
+    """
+    tokens = max(0, tokens)
+    uid = _user_id(user)
+    now = now or _now()
+    today = now.date().isoformat()
+    with db.connect() as conn:
+        try:
+            _upsert_user(conn, user, now)
+            db.execute(
+                conn,
+                "INSERT INTO token_tallies(user_id, total_tokens, last_tally_date) VALUES(?,?,?) "
+                "ON CONFLICT(user_id) DO NOTHING",
+                (uid, 0, today),
+            )
+            row = db.fetchone(
+                conn,
+                "SELECT total_tokens, last_tally_date FROM token_tallies WHERE user_id=? FOR UPDATE",
+                (uid,),
+            )
+            before = 0 if row["last_tally_date"] != today else row["total_tokens"]
+            after = before + tokens
+            db.execute(
+                conn,
+                "UPDATE token_tallies SET total_tokens=?, last_tally_date=? WHERE user_id=?",
+                (after, today, uid),
+            )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    return after // CREDIT_TOKENS - before // CREDIT_TOKENS
+
+
+def ensure_daily_grant(user: dict[str, Any], grant: int, now: datetime | None = None) -> dict[str, Any]:
+    """Create/update the user and refill to `grant` once per UTC day."""
+    now = now or _now()
+    today = now.date().isoformat()
+    uid = _user_id(user)
+    with db.connect() as conn:
+        try:
+            _upsert_user(conn, user, now)
+            # Atomic create so concurrent first-touch requests (the agent turn, the
+            # nested generate_code turn, and the webview's /v1/credits poll can all hit
+            # a brand-new user at once) don't race: exactly one INSERT wins. A losing
+            # creator's uncommitted INSERT blocks this one until it commits, so the row
+            # is always present for the locked SELECT below — never a missing-row read
+            # that the meter would later stream to the UI as a spurious `remaining: 0`.
+            inserted = db.execute(
+                conn,
+                "INSERT INTO credit_balances(user_id, balance, daily_grant, last_grant_date) "
+                "VALUES(?,?,?,?) ON CONFLICT(user_id) DO NOTHING",
+                (uid, grant, grant, today),
+            ).rowcount == 1
+            # Lock the row for the once-a-day refill read-modify-write.
+            row = db.fetchone(
+                conn,
+                "SELECT balance, daily_grant, last_grant_date FROM credit_balances WHERE user_id=? FOR UPDATE",
+                (uid,),
+            )
+            if inserted:
+                balance = grant
+                _ledger(conn, uid, "grant", grant, balance, "posted", now)
+            elif row["last_grant_date"] != today:
+                balance = grant
+                # New UTC day: refill the balance and zero the cumulative token tally.
+                db.execute(
+                    conn,
+                    "UPDATE credit_balances SET balance=?, daily_grant=?, last_grant_date=? WHERE user_id=?",
+                    (balance, grant, today, uid),
+                )
+                db.execute(
+                    conn,
+                    """
+                    INSERT INTO token_tallies(user_id, total_tokens, last_tally_date) VALUES(?,?,?)
+                    ON CONFLICT(user_id) DO UPDATE SET total_tokens=0, last_tally_date=excluded.last_tally_date
+                    """,
+                    (uid, 0, today),
+                )
+                _ledger(conn, uid, "grant", grant, balance, "posted", now)
+            else:
+                balance = row["balance"]
+                grant = row["daily_grant"]
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    return {
+        "balance": balance,
+        "daily_grant": grant,
+        "resets_at": _next_utc_midnight(now).isoformat(),
+        "login": user.get("login"),
+    }
+
+
+def debit(user: dict[str, Any], credits: int) -> int:
+    """Subtract `credits` atomically (floored at zero); return remaining balance."""
+    amount = max(0, credits)
+    uid = _user_id(user)
+    now = _now()
+    with db.connect() as conn:
+        try:
+            _upsert_user(conn, user, now)
+            db.execute(
+                conn,
+                "UPDATE credit_balances SET balance=CASE WHEN balance >= ? THEN balance - ? ELSE 0 END WHERE user_id=?",
+                (amount, amount, uid),
+            )
+            remaining = _balance(conn, uid)
+            if amount:
+                _bump_global_spend(conn, amount, now)
+                _ledger(conn, uid, "debit", -amount, remaining, "posted", now)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    return remaining
+
+
+def reserve(user: dict[str, Any], credits: int, *, global_budget: int | None = None) -> int | None:
+    """Atomically reserve `credits`; return remaining balance or None if the user is short.
+
+    When `global_budget` is set, the day's global free-tier spend is checked and incremented
+    in the SAME transaction as the balance change (the day row is locked FOR UPDATE first), so
+    concurrent reservations cannot race past the ceiling. Crossing it raises
+    GlobalBudgetExceeded -- a fail-fast cost/DoS guard, distinct from the per-user `None`."""
+    amount = max(0, credits)
+    uid = _user_id(user)
+    now = _now()
+    with db.connect() as conn:
+        try:
+            _upsert_user(conn, user, now)
+            if global_budget is not None and amount:
+                spent = _locked_global_spend(conn, now)
+                if spent + amount > global_budget:
+                    raise GlobalBudgetExceeded(spent)
+            result = db.execute(
+                conn,
+                "UPDATE credit_balances SET balance=balance - ? WHERE user_id=? AND balance >= ?",
+                (amount, uid, amount),
+            )
+            if result.rowcount != 1:
+                conn.rollback()
+                return None
+            remaining = _balance(conn, uid)
+            if amount:
+                _bump_global_spend(conn, amount, now)
+                _ledger(conn, uid, "reserve", -amount, remaining, "reserved", now)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    return remaining
+
+
+def refund(user: dict[str, Any], credits: int) -> int:
+    """Atomically add credits back; return remaining balance."""
+    amount = max(0, credits)
+    uid = _user_id(user)
+    now = _now()
+    with db.connect() as conn:
+        try:
+            _upsert_user(conn, user, now)
+            db.execute(conn, "UPDATE credit_balances SET balance=balance + ? WHERE user_id=?", (amount, uid))
+            remaining = _balance(conn, uid)
+            if amount:
+                _bump_global_spend(conn, -amount, now)
+                _ledger(conn, uid, "refund", amount, remaining, "posted", now)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    return remaining
+
+
+def global_spend_today(now: datetime | None = None) -> int:
+    """Today's cumulative free-tier credit outflow (reserve + debit, net of refund),
+    keyed by UTC date so it resets at midnight without an explicit job. The free-tier
+    daily-budget breaker reads this before reserving to keep abusive free traffic from
+    pushing the whole tier into DeepSeek's hard console cap (a global DoS)."""
+    now = now or _now()
+    with db.connect() as conn:
+        row = db.fetchone(
+            conn,
+            "SELECT credits_spent FROM daily_global_spend WHERE spend_date=?",
+            (now.date().isoformat(),),
+        )
+    return row["credits_spent"] if row else 0
+
+
+def _locked_global_spend(conn: Any, now: datetime) -> int:
+    """Today's global spend, with the day row locked FOR UPDATE so a concurrent reservation
+    can't read the same pre-increment value and both slip past the budget. 0 when no row
+    exists yet (first spend of the day); _bump_global_spend then creates it in this txn."""
+    row = db.fetchone(
+        conn,
+        "SELECT credits_spent FROM daily_global_spend WHERE spend_date=? FOR UPDATE",
+        (now.date().isoformat(),),
+    )
+    return row["credits_spent"] if row else 0
+
+
+def get_user(user_id: str) -> dict[str, Any] | None:
+    with db.connect() as conn:
+        return db.fetchone(conn, "SELECT * FROM users WHERE id=?", (str(user_id),))
+
+
+def get_user_by_login(login: str) -> dict[str, Any] | None:
+    """Look up a user by GitHub login (case-insensitive, matching `grant_for`). Returns
+    None if they've never logged in — there's no balance row to adjust yet."""
+    if not login:
+        return None
+    with db.connect() as conn:
+        return db.fetchone(conn, "SELECT * FROM users WHERE LOWER(login)=LOWER(?)", (login,))
+
+
+def set_balance(user: dict[str, Any], target: int, now: datetime | None = None) -> dict[str, Any]:
+    """Admin override: set this user's balance to exactly `target`, atomically, recording
+    the delta in the ledger. Idempotent (re-running lands the same balance), so it tops a
+    comped user up to a target today without waiting for the next UTC refill."""
+    target = max(0, target)
+    uid = _user_id(user)
+    now = now or _now()
+    today = now.date().isoformat()
+    with db.connect() as conn:
+        try:
+            _upsert_user(conn, user, now)
+            row = db.fetchone(
+                conn,
+                "SELECT balance FROM credit_balances WHERE user_id=? FOR UPDATE",
+                (uid,),
+            )
+            before = row["balance"] if row else 0
+            if row:
+                db.execute(conn, "UPDATE credit_balances SET balance=? WHERE user_id=?", (target, uid))
+            else:
+                db.execute(
+                    conn,
+                    "INSERT INTO credit_balances(user_id, balance, daily_grant, last_grant_date) VALUES(?,?,?,?)",
+                    (uid, target, grant_for(user), today),
+                )
+            _ledger(conn, uid, "admin_set", target - before, target, "posted", now)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+    return {"balance": target, "login": user.get("login")}
+
+
+def ledger_for_user(user_id: str) -> list[dict[str, Any]]:
+    with db.connect() as conn:
+        rows = db.fetchall(
+            conn,
+            "SELECT action, credits, balance_after, status FROM credit_ledger WHERE user_id=? ORDER BY id",
+            (str(user_id),),
+        )
+    return rows
+
+
+def reset() -> None:
+    """Test hook: clear initialized connection metadata only."""
+    db.reset_for_tests()
+
+
+def _upsert_user(conn: Any, user: dict[str, Any], now: datetime) -> None:
+    # Race-safe upsert: concurrent first-touch requests for the same new user must not
+    # race a SELECT-then-INSERT into a PK-conflict 500. `ON CONFLICT DO NOTHING` with no
+    # target ignores BOTH unique constraints on this table (id PK and gh_user_id), so a
+    # losing creator no-ops instead of erroring; the UPDATE then refreshes the mutable
+    # fields whether the row was just inserted or already existed.
+    uid = _user_id(user)
+    db.execute(
+        conn,
+        "INSERT INTO users(id, gh_user_id, login, email, created_at, last_seen_at) "
+        "VALUES(?,?,?,?,?,?) ON CONFLICT DO NOTHING",
+        (uid, uid, user.get("login"), user.get("email"), now.isoformat(), now.isoformat()),
+    )
+    db.execute(
+        conn,
+        "UPDATE users SET login=COALESCE(?, login), email=COALESCE(?, email), last_seen_at=? WHERE id=?",
+        (user.get("login"), user.get("email"), now.isoformat(), uid),
+    )
+
+
+def _bump_global_spend(conn: Any, amount: int, now: datetime) -> None:
+    # Accumulate the day's free-tier credit outflow in the SAME transaction as the
+    # balance change, so a rollback of the debit/reserve/refund rolls back the count
+    # too — the global tally never drifts from credits actually committed. Hooked on
+    # reserve (+) and refund (-) too, not only debit, so a turn that disconnects before
+    # metering (reserve kept, never debited) still counts against the budget.
+    if amount == 0:
+        return
+    # Floor the tally at 0: a refund that crosses the UTC-day boundary (credit reserved
+    # before midnight, refunded after) lands a -1 on a fresh day's row with no matching
+    # +1. GREATEST(0, ...) keeps that from driving the day negative and silently
+    # weakening the breaker — a negative tally would never trip the >= budget gate.
+    db.execute(
+        conn,
+        "INSERT INTO daily_global_spend(spend_date, credits_spent) VALUES(?,?) "
+        "ON CONFLICT(spend_date) DO UPDATE SET credits_spent = GREATEST(0, daily_global_spend.credits_spent + ?)",
+        (now.date().isoformat(), max(0, amount), amount),
+    )
+
+
+def _balance(conn: Any, user_id: str) -> int:
+    row = db.fetchone(conn, "SELECT balance FROM credit_balances WHERE user_id=?", (user_id,))
+    return row["balance"] if row else 0
+
+
+def _ledger(conn: Any, user_id: str, action: str, credits: int, balance_after: int, status: str, now: datetime) -> None:
+    db.execute(
+        conn,
+        "INSERT INTO credit_ledger(user_id, action, credits, balance_after, status, created_at) VALUES(?,?,?,?,?,?)",
+        (user_id, action, credits, balance_after, status, now.isoformat()),
+    )
