@@ -81,6 +81,12 @@ p{font-size:16px;line-height:1.8;color:var(--text)}
 .soon{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;background:rgba(255,176,32,.1);border:1px solid rgba(255,176,32,.4);color:var(--amber);font:12px/1 'Courier New',monospace;letter-spacing:2px}
 .mono{font-family:'Courier New',monospace}
 .persona{font-size:44px;animation:rise 3.5s ease-in-out infinite}
+.shot{max-width:760px;width:100%;margin:22px auto 0;border-radius:14px;overflow:hidden;border:1px solid rgba(0,245,255,.28);box-shadow:var(--gcyan);position:relative;background:#040810}
+.shot img{display:block;width:100%;height:auto;max-height:44vh;object-fit:cover}
+.shot .cap{position:absolute;left:0;right:0;bottom:0;padding:10px 16px;font:12px/1 'Courier New',monospace;letter-spacing:3px;color:var(--cyan);text-transform:uppercase;background:linear-gradient(0deg,rgba(4,8,16,.92),rgba(4,8,16,0))}
+.shot .cap::before{content:'\25A3  '}
+.shot.p{border-color:rgba(139,92,246,.3);box-shadow:var(--gpur)}.shot.p .cap{color:var(--purple)}
+.shot.g{border-color:rgba(0,255,157,.3);box-shadow:var(--ggreen)}.shot.g .cap{color:var(--green)}
 </style>
 </head>
 <body>
@@ -130,7 +136,43 @@ p{font-size:16px;line-height:1.8;color:var(--text)}
   </div>
 </div>
 
-<!-- 3 一句话 -->
+<!-- 3 为什么二维不行 -->
+<div class="slide">
+  <div class="content-box" style="text-align:center">
+    <div class="stl stag">WHY 2D FAILS</div>
+    <h2 class="stag d1">二维图纸，救不了小白</h2>
+    <div class="sep stag d1"></div>
+    <div class="g3 stag d2" style="margin-top:26px">
+      <div class="card a"><h3 style="color:var(--amber)">看不懂</h3><p class="dim">电路图、原理图是画给<span class="ax">工程师</span>的语言——一堆符号和连线，小白根本读不出这是个什么东西。</p></div>
+      <div class="card a"><h3 style="color:var(--amber)">是死的</h3><p class="dim">平面图纸<span class="ax">不会动</span>：灯不会亮、屏幕不显示、马达不转，你看不出它到底能不能跑。</p></div>
+      <div class="card a"><h3 style="color:var(--amber)">要脑补</h3><p class="dim">得自己在脑子里「运行」这张图——可小白连零件都没见过，<span class="ax">凭什么脑补得出来？</span></p></div>
+    </div>
+    <div class="big stag d4" style="margin-top:28px;font-size:clamp(18px,2.7vw,34px)">
+      盯着一张二维图，小白心里永远是那句：<br><span class="pkx">「我觉得……应该能行吧？」</span>
+    </div>
+    <p class="lead stag d5" style="margin-top:20px">图纸给的是一句<span class="dim">承诺</span>，不是一个<span class="cx">证据</span>。没有证据，谁也不敢下单、不敢动手。</p>
+  </div>
+</div>
+
+<!-- 4 为什么要 3D + 动态 -->
+<div class="slide">
+  <div class="content-box" style="text-align:center">
+    <div class="stl stag">WHY 3D &amp; ALIVE</div>
+    <h2 class="stag d1">小白要的，是「亲眼看到它动」</h2>
+    <div class="sep stag d1"></div>
+    <div class="big stag d2" style="margin-top:18px;font-size:clamp(18px,2.6vw,32px)">
+      AI 是<span class="px">大脑</span>，帮你把东西做出来；<br>3D 动态仿真是<span class="cx">眼睛</span>，让你<span class="cx">看到它真的被做出来了</span>。
+    </div>
+    <div class="g2 stag d4" style="margin-top:26px;max-width:980px">
+      <div class="card a"><h3 style="color:var(--amber)">二维 · 静态</h3><p class="dim">一张图，看得懂才行 · 不会动 · 「应该能行吧？」<br><span class="ax">理性、抽象、工程师思维</span></p></div>
+      <div class="card g"><h3 style="color:var(--green)">三维 · 动态</h3><p><span class="gx">看得见的元件 · 通上电真的跑 · 灯亮、屏幕显示、马达转</span><br>感性、具体、<span class="gx">人人都懂</span></p></div>
+    </div>
+    <div class="huge stag d5" style="margin-top:24px;font-size:clamp(24px,4.2vw,54px)">从「应该能行吧？」<br>→ <span class="gx">「卧槽，它真的动了！」</span></div>
+    <p class="lead stag d6" style="margin-top:20px">这不是炫技，是<span class="cx">情绪的转折点</span>——看见它活着，小白才敢下单、才敢动手。</p>
+  </div>
+</div>
+
+<!-- 5 一句话 -->
 <div class="slide">
   <div class="content-box" style="text-align:center">
     <div class="stl stag">JUST SAY IT</div>
@@ -146,10 +188,11 @@ p{font-size:16px;line-height:1.8;color:var(--text)}
       <span class="chip">「宠物喂食器，手机能控制」</span>
     </div>
     <p class="lead stag d5" style="margin-top:24px">用大白话，用你自己的说法。<span class="cx">剩下的，交给它。</span></p>
+    <div class="shot stag d6"><img src="docs/首页.png" alt="首页" loading="lazy"><div class="cap">首页</div></div>
   </div>
 </div>
 
-<!-- 4 魔法时刻 -->
+<!-- 6 魔法时刻 -->
 <div class="slide">
   <div class="content-box" style="text-align:center">
     <div class="stl stag">THE MAGIC MOMENT</div>
@@ -162,46 +205,52 @@ p{font-size:16px;line-height:1.8;color:var(--text)}
     </div>
     <div class="huge stag d3">不是给你一堆代码。<br><span class="gx">是让你看见——它，动，了。</span></div>
     <p class="lead stag d5" style="margin-top:26px">这一刻，从「我觉得应该能行吧？」变成<span class="cx">「卧槽，它真的动了！」</span></p>
+    <div class="shot g stag d6"><img src="docs/实际演示.png" alt="实际演示" loading="lazy"><div class="cap">实际演示</div></div>
   </div>
 </div>
 
-<!-- 5 独特：世界第一个 -->
+<!-- 7 3D 仿真引擎：不是动画，是仿真 -->
+<div class="slide">
+  <div class="content-box" style="text-align:center">
+    <div class="stl stag">THE 3D ENGINE</div>
+    <h2 class="stag d1">不是动画，是仿真</h2>
+    <div class="sep stag d1"></div>
+    <div class="big stag d2" style="margin-top:18px;font-size:clamp(18px,2.6vw,32px)">
+      你的硬件以<span class="cx">真实的 3D</span>出现在浏览器里——<br>可以转、可以拆，<span class="gx">通上电就真的跑起来。</span>
+    </div>
+    <div class="g2 stag d4" style="margin-top:24px;max-width:980px">
+      <div class="card"><h3 style="color:var(--cyan)">看得见</h3><p class="dim">灯亮、屏幕显示、马达转、传感器读数、串口滚动——都在 3D 里实时发生。</p></div>
+      <div class="card g"><h3 style="color:var(--green)">是真的</h3><p><span class="gx">跑的是同一份固件</span>：虚拟硬件和真硬件表现一致，不是预录动画。</p></div>
+    </div>
+    <div class="shot p stag d5"><img src="docs/仿真效果.png" alt="仿真效果" loading="lazy"><div class="cap">仿真效果</div></div>
+    <p class="lead stag d6" style="margin-top:18px">在花一分钱之前，你先<span class="cx">看见它活着</span>——满意了，再造出实物。</p>
+  </div>
+</div>
+
+<!-- 8 差异化：世界第一个 -->
 <div class="slide">
   <div class="content-box" style="text-align:center">
     <div class="stl stag">WORLD FIRST</div>
-    <h2 class="stag d1">世界上第一个「一句话长出一整个硬件装置」的东西</h2>
+    <h2 class="stag d1">这个位置，只有我们站着</h2>
     <div class="sep stag d1"></div>
-    <div class="big stag d2" style="margin-top:22px;font-size:clamp(19px,2.7vw,34px)">
-      别人给你<span class="dim">一半</span>，我们给你<span class="cx">整个东西</span>。
+    <div class="big stag d2" style="margin-top:18px;font-size:clamp(18px,2.6vw,32px)">
+      世界上第一个「一句话 → 一整个 3D 硬件 → 一键变实物」。<br><span class="cx">别人给你一段，我们给你一整条路。</span>
     </div>
-    <div class="g3 stag d4" style="margin-top:30px">
-      <div class="card a"><h3 style="color:var(--amber)">AI 画电路图 + 二维仿真</h3><p class="dim">平面图纸，你还得看得懂、会连线焊接</p></div>
-      <div class="card a"><h3 style="color:var(--amber)">AI 写嵌入式代码</h3><p class="dim">给你代码，但要真机、要调试，能不能跑得自己试</p></div>
-      <div class="card"><h3 style="color:var(--cyan)">Blockless</h3><p><span class="cx">一句话，一整个能跑的 3D 硬件装置——先看见，再决定买或做。</span></p></div>
+    <div class="g3 stag d4" style="margin-top:24px">
+      <div class="card a"><h3 style="color:var(--amber)">AI 画电路图</h3><p class="dim">给你一张二维图纸，还得你自己看懂、连线、焊接</p></div>
+      <div class="card a"><h3 style="color:var(--amber)">手动仿真 · Wokwi</h3><p class="dim">很真，但要你自己拖零件、自己写代码、自己调试</p></div>
+      <div class="card a"><h3 style="color:var(--amber)">AI 写嵌入式代码</h3><p class="dim">给你代码，能不能跑、怎么烧录，自己想办法</p></div>
     </div>
-    <p class="lead stag d6" style="margin-top:24px">Lovable 让不懂代码的人做出软件。<span class="cx">Blockless 让不懂硬件的人做出硬件。</span></p>
+    <div class="g3 stag d5" style="margin-top:14px">
+      <div class="card"><h3 style="color:var(--cyan)">说一句话就生成</h3><p class="dim">而不是手动拖零件、写代码</p></div>
+      <div class="card p"><h3>看得见地 3D 跑起来</h3><p class="dim">动态仿真，不是静态渲染图</p></div>
+      <div class="card g"><h3 style="color:var(--green)">一键变成真东西</h3><p class="dim">同一份设计，直接下单造出来</p></div>
+    </div>
+    <p class="lead stag d6" style="margin-top:20px">Lovable 让不懂代码的人做出软件。<span class="cx">Blockless 让不懂硬件的人做出硬件。</span></p>
   </div>
 </div>
 
-<!-- 6 即将到来：真的 3D 仿真 -->
-<div class="slide">
-  <div class="content-box" style="text-align:center">
-    <div class="stl stag">COMING NEXT</div>
-    <div class="soon stag d1" style="margin-bottom:16px">&#9679; 下一站</div>
-    <h2 class="stag d1">真正的三维仿真，就像 Wokwi 一样真</h2>
-    <div class="sep stag d1"></div>
-    <div class="big stag d2" style="margin-top:20px;font-size:clamp(19px,2.7vw,34px)">
-      你的硬件会以<span class="cx">真实的 3D</span>出现在浏览器里——<br>可以转、可以拆、<span class="gx">通上电就真的跑起来。</span>
-    </div>
-    <div class="g2 stag d4" style="margin-top:28px;max-width:960px">
-      <div class="card a"><h3 style="color:var(--amber)">Wokwi 那样的仿真</h3><p class="dim">很真，但你得自己连线、自己写代码、自己调试</p></div>
-      <div class="card g"><h3 style="color:var(--green)">Blockless 的仿真</h3><p><span class="gx">一样真，但全是 AI 帮你生成的。</span>你只管看它跑，满意了再造出实物。</p></div>
-    </div>
-    <p class="lead stag d6" style="margin-top:22px">灯亮、屏幕显示、马达转、传感器读数……<span class="cx">在花一分钱之前，你先看见它活着。</span></p>
-  </div>
-</div>
-
-<!-- 7 三个人 -->
+<!-- 9 三个人 -->
 <div class="slide">
   <div class="content-box" style="text-align:center">
     <div class="stl stag">WHO IT'S FOR</div>
@@ -217,28 +266,11 @@ p{font-size:16px;line-height:1.8;color:var(--text)}
       <span class="chip">错误从 $5,000 变成 $0</span>
       <span class="chip">硬件的 Free Trial</span>
     </p>
+    <div class="shot stag d6"><img src="docs/用户实测.png" alt="用户实测" loading="lazy"><div class="cap">用户实测</div></div>
   </div>
 </div>
 
-<!-- 8 为什么是我们 -->
-<div class="slide">
-  <div class="content-box" style="text-align:center">
-    <div class="stl stag">WHY US</div>
-    <h2 class="stag d1">这个位置，只有我们站着</h2>
-    <div class="sep stag d1"></div>
-    <div class="big stag d2" style="margin-top:22px;font-size:clamp(20px,3vw,38px)">
-      有人做 AI 画电路板，有人做手动仿真，<br><span class="cx">没有人做「说一句话 → 一整个硬件 → 一键变实物」。</span>
-    </div>
-    <div class="g3 stag d4" style="margin-top:30px">
-      <div class="card"><h3 style="color:var(--cyan)">说一句话就生成</h3><p class="dim">而不是手动拖零件、写代码</p></div>
-      <div class="card p"><h3>看得见地跑起来</h3><p class="dim">3D 仿真，不是静态渲染图</p></div>
-      <div class="card g"><h3 style="color:var(--green)">一键变成真东西</h3><p class="dim">同一份设计，直接下单造出来</p></div>
-    </div>
-    <p class="lead stag d6" style="margin-top:24px">别人有一段，我们有<span class="cx">一整条路：从想法，到实物。</span></p>
-  </div>
-</div>
-
-<!-- 9 愿景 + 结尾 -->
+<!-- 10 愿景 + 结尾 -->
 <div class="slide">
   <div class="content-box" style="text-align:center">
     <div class="logo-ring stag" style="width:84px;height:84px;font-size:38px">&#9631;</div>
